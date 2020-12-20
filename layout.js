@@ -15,7 +15,7 @@ data.forEach(function (line) {
 
 var createLayout = require('ngraph.forcelayout');
 var layout = createLayout(graph);
-var ITERATIONS_COUNT = 1000;
+var ITERATIONS_COUNT = 10000;
 for (var i = 0; i < ITERATIONS_COUNT; ++i) {
   console.log('step', i)
   layout.step();

@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>gephi-web-viewer</title>
+  <script src="static/jquery.js" ></script>
+  <script src="static/lys.js" ></script>
+  <script src="static/sigma.js" ></script>
+  <script src="static/plugins.js" ></script>
+  <style>
+    #graph-container {
+      top: 0;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      position: absolute;
+      background: #eee;
+    }
+    #rightpanel {
+      top: 0;
+      bottom: 0;
+      right: 0;
+      position: absolute;
+      width: 300px;
+      display: none;
+      padding: 10px;
+      background-color: rgb(249, 247, 237);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      overflow: auto;
+    }
+    #leftpanel {
+      margin-top: 50px;
+      margin-left: 25px;
+      background: #fff;
+      background-color: rgb(255, 255, 255);
+      background-color: rgba(255,255,255,0.8);
+      border: 1px solid #ccc;
+      position: fixed;
+      top: 0;
+      padding: 10px;
+      width: 300px;
+      overflow: auto;
+      max-height: 50%;
+    }
+  </style>
+</head>
+</body>
+<div>
+  <div id="graph-container"></div>
+  <div id="leftpanel"></div>
+  <div id="rightpanel"></div>
+</div>
+
+<script>
+
+var s; // sigma instance
+var s_filter; // sigma filter plugin
+
+function parseJSON(data) {
+  var g = {
+    nodes: [],
+    edges: []
+  };
+
+  for (i=0; i<data.nodes.length; i++){
+    var node = data.nodes[i];
+    // s.addNode(id,data.nodes[i]);
+
+    g.nodes.push({
+      id: node.id,
+      label: node.label,
+      x: node.x,
+      y: node.y,
+      size: node.size + 3,
+      color: node.color,
+      attributes: node.attributes,
+    });
+  }
+
+  for(j=0; j<data.links.length; j++){
+    var edge = data.links[j];
+
+    g.edges.push({
+      id: edge.id,
+      source: edge.source,
+      target: edge.target,
+      size: edge.size,
+      color: edge.color,
+      type: 'curve',
+    });
+  }
+
+  return g;
+}
+
+function nodeByID(id) {
+  return s.graph.nodes().filter(node => node['id'] === id).pop();
+}
+
+function getNodeInfos(node) {
+  html = L.render([
+    L.h2(node.label),
+    getNodeAttributesInfos(node),
+    L.hr(),
+    getNodeLinkInfos(node)
+  ])
+  return html
+}
+
+function getNodeAttributesInfos(node) {
+  var attributes = node.attributes;
+  var attributes_html = [];
+
+  for (attribute in attributes) {
+    var value = attributes[attribute];
+    attributes_html.push([
+      L.strong(attribute + ': '),
+      value,
+      L.br(),
+      L.br(),
+    ])
+  }
+
+  return attributes_html;
+}
+
+function getNodeLinkInfos(node) {
+    var incoming = [];
+    var outcoming = [];
+
+    s.graph.edges().forEach(function(edge) {
+      if (edge.source == node.id) {
+        outcoming.push(nodeByID(edge.target).id);
+      }
+      else if (edge.target == node.id) {
+        incoming.push(nodeByID(edge.source).id);
+      }
+    })
+
+    var incoming_filtered = [];
+    var outcoming_filtered = [];
+    var mutual = [];
+    incoming.forEach(function(node) {
+      if (outcoming.indexOf(node) === -1) {
+        incoming_filtered.push(node)
+      } else {
+        mutual.push(node)
+      }
+    });
+    outcoming.forEach(function(node) {
+      if (incoming.indexOf(node) === -1) {
+        outcoming_filtered.push(node)
+      }
+    });
+
+    incoming = incoming_filtered.map(node => nodeByID(node))
+    outcoming = outcoming_filtered.map(node => nodeByID(node))
+    mutual = mutual.map(node => nodeByID(node))
+
+    var mutual_html = ''
+    if (mutual.length) {
+      mutual_html = [
+        L.strong("Mutal"),
+        L.br(),
+        L.ul(mutual.map(node => 
+          L.li(L.a(node.label, {href: '#'+node.id}))
+        ))
+      ]
+    }
+    var incoming_html = ''
+    if (incoming.length) {
+      incoming_html = [
+        L.strong("Incoming"),
+        L.br(),
+        L.ul(incoming.map(node => 
+          L.li(L.a(node.label, {href: '#'+node.id}))
+        ))
+      ]
+    }
+    var outcoming_html = ''
+    if (outcoming.length) {
+      outcoming_html = [
+        L.strong("Outcoming"),
+        L.br(),
+        L.ul(outcoming.map(node => 
+          L.li(L.a(node.label, {href: '#'+node.id}))
+        ))
+      ]
+    }
+    html = [
+      L.p(L.strong("Connections")),
+      mutual_html,
+      incoming_html,
+      outcoming_html,
+    ]
+    return html
+}
+
+function renderLeftPanel(config_data) {
+  html = L.render([
+    L.h3(config_data.text.title),
+    L.p(L.input('', {placeholder: 'search'})),
+    L.p('', {id: 'search-results'}),
+  ])
+
+  $('#leftpanel').html(html)
+  $('#leftpanel input').on('input', function() {
+    var q = $(this).val().toLowerCase();
+    var results = [];
+    if (q) {
+      results = s.graph.nodes().filter(node => node.label.toLowerCase().indexOf(q) !== -1);
+    }
+    html_results = ''
+    if (results.length) {
+      html_results_list = []
+      results.forEach((node, i) => {
+        if (i > 10) return;
+        html_results_list.push(L.li(L.a(node.label, {href: '#' + node.id})))
+      })
+      html_results = L.render(L.ul(html_results_list))
+    }
+    $('#search-results').html(html_results);
+  })
+}
+
+function locationHashChanged() {
+  if (location.hash) {
+    var node_id = decodeURIComponent(location.hash.substring(1))
+    selectNode(node_id);
+  }
+}
+
+function selectNode(node_id) {
+    s_filter.undo()
+    s_filter.neighborsOf(node_id).apply();
+    $('#rightpanel').html(getNodeInfos(nodeByID(node_id)))
+    $('#rightpanel').show()
+}
+
+$.getJSON('data.json', function (data) {
+  $.getJSON('config.json', function (config_data) {
+
+    var g = parseJSON(data);
+
+    s = new sigma({
+      graph: g, 
+      renderer: {
+        container: 'graph-container',
+        type: sigma.renderers.canvas,
+      },
+      settings: {
+        hideEdgesOnMove: true,
+        autoRescale: false,
+        zoomMax: 10,
+      },
+    });
+
+    renderLeftPanel(config_data);
+
+    s.camera.goTo({
+      x: 0,
+      y: 0,
+      angle: 0,
+      ratio: 3
+    });
+
+    s_filter = new sigma.plugins.filter(s);
+
+    s.bind('clickNode', function(e) {
+      selectNode(e.data.node.id)
+    });
+
+    s.bind('clickStage', function(e) {
+      s_filter.undo().apply();
+      $('#rightpanel').hide();
+      window.location.hash = '';
+    });
+
+    window.onhashchange = locationHashChanged;
+  });
+});
+</script>
+</body>
