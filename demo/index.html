@@ -70,7 +70,7 @@ function parseJSON(data) {
       label: node.label,
       x: node.x,
       y: node.y,
-      size: node.size + 3,
+      size: 3,
       color: node.color,
       attributes: node.attributes,
     });
@@ -83,8 +83,8 @@ function parseJSON(data) {
       id: edge.id,
       source: edge.source,
       target: edge.target,
-      size: edge.size,
-      color: edge.color,
+      size: 0.2,
+      color: edge.color.replace(',50', ',10'),
       type: 'curve',
     });
   }

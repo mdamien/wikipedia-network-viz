@@ -15,7 +15,7 @@ data.forEach(function (line) {
 
 var createLayout = require('ngraph.forcelayout');
 var layout = createLayout(graph);
-var ITERATIONS_COUNT = 10000;
+var ITERATIONS_COUNT = 1000;
 for (var i = 0; i < ITERATIONS_COUNT; ++i) {
   console.log('step', i)
   layout.step();
@@ -27,6 +27,12 @@ var clusters = detectClusters(graph);
 var toJSON = require('ngraph.tojson');
 
 
+var PALETTES = [[230,184,179],
+[168,219,229],
+[212,217,182],
+[195,188,222],
+[156,196,177]]
+
 var json = toJSON(graph,
   node => {
     return {
@@ -37,7 +43,14 @@ var json = toJSON(graph,
         attributes: {
             cluster: clusters.getClass(node.id),
         },
-        color: "rgb("+ (clusters.getClass(node.id)*50 % 255) + ",192,192)",
+        color: "rgb("
+            + PALETTES[clusters.getClass(node.id) % PALETTES.length][0]
+            + ","
+            + PALETTES[clusters.getClass(node.id) % PALETTES.length][1]
+            + ","
+            + PALETTES[clusters.getClass(node.id) % PALETTES.length][2]
+            + ")",
+        size: 1,
     };
   },
   link => {
@@ -46,8 +59,17 @@ var json = toJSON(graph,
         target: link.toId,
         id: link.fromId+';'+link.toId,
         attributes: {},
-        color: "rgb("+ (clusters.getClass(link.fromId)*50 % 255) + ",192,192)"
-    };
+        color: "rgba("
+            + PALETTES[clusters.getClass(link.fromId) % PALETTES.length][0]
+            + ","
+            + PALETTES[clusters.getClass(link.fromId) % PALETTES.length][1]
+            + ","
+            + PALETTES[clusters.getClass(link.fromId) % PALETTES.length][2]
+            + ","
+            + "50"
+            + ")",
+        size: 1,
+        };
   });
 
-fs.writeFileSync('data/graph.json', json);
+fs.writeFileSync('demo/data.json', json);
